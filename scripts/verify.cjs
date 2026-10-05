@@ -9,11 +9,19 @@ const fs=require('node:fs');
  await page.evaluate(()=>document.fonts.ready);
  await page.screenshot({path:'/tmp/kretschmer-desktop.png',fullPage:true});
  assert.equal(await page.locator('h1').count(),1);
+ assert.equal(await page.locator('.burial-gallery article').count(),4);
+ assert.equal(await page.locator('.credential').count(),3);
+ for(const img of await page.locator('.burial-gallery img').all()){await img.scrollIntoViewIfNeeded();await img.evaluate(el=>el.decode());assert.ok(await img.evaluate(el=>el.naturalWidth>0));}
+ await page.locator('.comparison summary').click();assert.equal(await page.locator('.comparison table').isVisible(),true);await page.locator('.comparison summary').click();
+ await page.locator('#wege').screenshot({path:'/tmp/kretschmer-v2-burials.png'});
+ await page.locator('#qualitaet').screenshot({path:'/tmp/kretschmer-v2-credentials.png'});
+ await page.locator('#trauerbegleitung').screenshot({path:'/tmp/kretschmer-v2-aftercare.png'});
+
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.locator('.hero [data-start]').click();
  assert.equal(await page.locator('[data-next]').isDisabled(),true);
  await page.getByLabel('Ein Mensch ist verstorben',{exact:false}).check();await page.locator('[data-next]').click();
- await page.getByLabel('Ich weiß es noch nicht',{exact:false}).check();await page.locator('[data-next]').click();
+ assert.equal(await page.locator('.choice-macro').count(),4);await page.getByLabel('Ich weiß es noch nicht',{exact:false}).check();await page.locator('[data-next]').click();
  await page.getByLabel('Das möchte ich noch offenlassen',{exact:false}).check();await page.locator('[data-next]').click();
  await page.getByLabel('Die Kosten im Blick behalten',{exact:true}).check();
  await page.getByLabel('Möchten Sie uns etwas mitgeben?',{exact:false}).fill('Test: <script>alert(1)</script>');
@@ -25,19 +33,19 @@ const fs=require('node:fs');
  assert.match(await page.locator('.summary-list').innerText(),/Die Kosten im Blick behalten/);
  assert.equal(await page.locator('.summary-list script').count(),0);
  await page.locator('[data-edit="1"]').click();assert.equal(await page.getByLabel('Ich weiß es noch nicht',{exact:false}).isChecked(),true);
- await page.getByLabel('Baumbestattung',{exact:false}).check();await page.locator('[data-next]').click();await page.locator('[data-next]').click();await page.locator('[data-next]').click();await page.locator('[data-next]').click();
+ await page.getByRole('radio',{name:/^Baumbestattung/}).check();await page.locator('[data-next]').click();await page.locator('[data-next]').click();await page.locator('[data-next]').click();await page.locator('[data-next]').click();
  assert.match(await page.locator('.summary-list').innerText(),/Baumbestattung/);
  await page.locator('[data-next]').click();assert.match(await page.locator('.completion').innerText(),/nichts versendet/);
  const downloadPromise=page.waitForEvent('download');await page.locator('[data-download]').click();const download=await downloadPromise;const content=fs.readFileSync(await download.path(),'utf8');assert.match(content,/Baumbestattung/);assert.match(content,/Keine Anfrage versendet/);
  await page.locator('[data-reset]').click();assert.equal(await page.locator('[data-next]').isDisabled(),true);
  await page.keyboard.press('Escape');assert.equal(await page.locator('#consultation').evaluate(x=>x.open),false);
- for(const key of ['documents','earth','fire','tree','sea','farewell','costs','locations','legal','privacy']){await page.locator(`[data-info="${key}"]`).click();assert.equal(await page.locator('#information').evaluate(x=>x.open),true);await page.keyboard.press('Escape');}
- for(const width of [390,768,1024]){await page.setViewportSize({width,height:844});await page.goto('http://localhost:4173',{waitUntil:'networkidle'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`overflow at ${width}`);}
+ for(const key of ['documents','earth','fire','tree','sea','farewell','costs','locations','legal','privacy','grief','children','condolence']){await page.locator(`[data-info="${key}"]`).first().click();assert.equal(await page.locator('#information').evaluate(x=>x.open),true);if(['earth','fire','tree','sea'].includes(key))assert.equal(await page.locator('.info-macro').count(),1);await page.keyboard.press('Escape');}
+ for(const width of [320,390,768,1024]){await page.setViewportSize({width,height:844});await page.goto('http://localhost:4173',{waitUntil:'networkidle'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`overflow at ${width}`);}
  await page.setViewportSize({width:390,height:844});await page.goto('http://localhost:4173',{waitUntil:'networkidle'});await page.screenshot({path:'/tmp/kretschmer-mobile.png',fullPage:true});
- await page.locator('.menu-toggle').click();assert.equal(await page.locator('#mobile-nav').isVisible(),true);await page.locator('#mobile-nav a[href="#vorsorge"]').click();assert.equal(await page.locator('#mobile-nav').isVisible(),false);
+ await page.locator('.burial-card').first().screenshot({path:'/tmp/kretschmer-v2-mobile-card.png'});await page.locator('.menu-toggle').click();assert.equal(await page.locator('#mobile-nav').isVisible(),true);await page.locator('#mobile-nav a[href="#vorsorge"]').click();assert.equal(await page.locator('#mobile-nav').isVisible(),false);
  await page.locator('#vorsorge [data-start]').click();assert.match(await page.locator('#flow-title').innerText(),/Welche Form/);await page.screenshot({path:'/tmp/kretschmer-mobile-flow.png'});assert.equal(await page.locator('.flow-main').evaluate(el=>el.scrollWidth>el.clientWidth),false);
  await page.keyboard.press('Escape');await page.evaluate(()=>document.documentElement.style.fontSize='200%');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({passed:true,checks:['All six steps','Invalid and empty input','Editing and state retention','Safe text rendering','Download contents','Reset','10 information dialogs','Keyboard close','390/768/1024/1440 responsive layouts','Mobile navigation and flow','No console/network errors'],webmcpNative:await page.evaluate(()=>!!document.modelContext?.registerTool)}));
+ console.log(JSON.stringify({passed:true,checks:['All six steps','Invalid and empty input','Editing and state retention','Safe text rendering','Download contents','Reset','13 information dialogs','Keyboard close','320/390/768/1024/1440 responsive layouts','Mobile navigation and flow','No console/network errors'],webmcpNative:await page.evaluate(()=>!!document.modelContext?.registerTool)}));
  await browser.close();
 })().catch(e=>{console.error(e);process.exit(1)});
